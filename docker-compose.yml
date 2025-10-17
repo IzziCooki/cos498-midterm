@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:80" # Map external port 3000 to container's port 80 (Nginx)
+    depends_on:
+      - backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8080:8080" # Map external port 5000 to container's port 5000
+    environment:
+      # Example environment variable for the server to connect to the client (if needed)
+      CLIENT_URL: http://client:3000
