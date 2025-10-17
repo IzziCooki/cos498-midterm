@@ -52,13 +52,22 @@ jobs:
         env:
           NODE_ENV: development
 
-      # 7. Run tests inside docker-compose
-      - name: Run Vitest tests
-        run: docker compose -f docker-compose.yml run --rm <service_name> npm test
+      # 7a. Run tests for frontend service
+      - name: Run frontend Vitest tests
+        run: docker compose -f docker-compose.yml run --rm frontend npm test
         env:
           CI: true
           NODE_ENV: test
         timeout-minutes: 10
+
+      # 7b. Run tests for backend service
+      - name: Run backend tests
+        run: docker compose -f docker-compose.yml run --rm backend npm test
+        env:
+          CI: true
+          NODE_ENV: test
+        timeout-minutes: 10
+
 
       # 8. Login to Docker Hub
       - name: Log in to Docker Hub
