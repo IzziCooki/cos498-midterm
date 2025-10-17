@@ -48,13 +48,13 @@ jobs:
 
       # 6. Build Docker images using docker-compose
       - name: Build Docker images with docker-compose
-        run: docker-compose -f docker-compose.yml build
+        run: docker compose -f docker-compose.yml build
         env:
           NODE_ENV: development
 
       # 7. Run tests inside docker-compose
       - name: Run Vitest tests
-        run: docker-compose -f docker-compose.yml run --rm <service_name> npm test
+        run: docker compose -f docker-compose.yml run --rm <service_name> npm test
         env:
           CI: true
           NODE_ENV: test
@@ -69,4 +69,4 @@ jobs:
 
       # 9. Push Docker images
       - name: Push Docker images to Docker Hub
-        run: docker-compose -f docker-compose.yml push
+        run: docker compose -f docker-compose.yml push
