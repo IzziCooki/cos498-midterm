@@ -5,6 +5,7 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -17,25 +18,44 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node.js
+      # Frontend: setup node with cache tied to frontend lockfile (if present)
+      - name: Use Node (frontend)
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install & test frontend
-        working-directory: ./frontend
+        working-directory: frontend
         run: |
-          npm ci
+          # if there's a lockfile prefer `npm ci`, otherwise fall back to `npm install`
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
           npm test
         env:
           CI: true
           NODE_ENV: test
 
+      # Backend: setup node with cache tied to backend lockfile (if present)
+      - name: Use Node (backend)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
       - name: Install & test backend
-        working-directory: ./backend
+        working-directory: backend
         run: |
-          npm ci
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
           npm test
         env:
           CI: true
@@ -51,7 +71,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up QEMU (cross-build)
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
       - name: Set up Docker Buildx
@@ -70,8 +90,8 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/my-frontend:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/my-frontend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/cos498-midterm-frontend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/cos498-midterm-frontend:${{ github.sha }}
 
       - name: Build & push backend image
         uses: docker/build-push-action@v4
@@ -80,5 +100,5 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/my-backend:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/my-backend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/cos498-midterm-backend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/cos498-midterm-backend:${{ github.sha }}
