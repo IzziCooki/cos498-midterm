@@ -1,81 +1,84 @@
-name: CI/CD – React.js Application with Docker Compose
+name: CI — test, build, push
 
 on:
   push:
-    branches: [master]
+    branches: [ master ]
   pull_request:
-    branches: [master]
-    types: [opened, synchronize, reopened]
+    branches: [ master ]
+
+permissions:
+  contents: read
 
 jobs:
-  build-test-push:
-    name: Build, Test and Push Docker Images
+  test:
+    name: Run frontend & backend tests
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Checkout source code
-      - name: Checkout source code
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install & test frontend
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm test
+        env:
+          CI: true
+          NODE_ENV: test
+
+      - name: Install & test backend
+        working-directory: ./backend
+        run: |
+          npm ci
+          npm test
+        env:
+          CI: true
+          NODE_ENV: test
+
+  build-and-push:
+    name: Build and push Docker images
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. Set up Docker Buildx
+      - name: Set up QEMU (cross-build)
+        uses: docker/setup-qemu-action@v2
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 3. Cache Docker layers (optional)
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-buildx-
-
-      # 4. Cache npm dependencies
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: ${{ runner.os }}-npm-
-
-      # 5. Extract metadata
-      - name: Extract metadata
-        id: meta
-        run: |
-          echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> "$GITHUB_OUTPUT"
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
-      # 6. Build Docker images using docker-compose
-      - name: Build Docker images with docker-compose
-        run: docker compose -f docker-compose.yml build
-        env:
-          NODE_ENV: development
-
-      # 7a. Run tests for frontend service
-      - name: Run frontend Vitest tests
-        run: docker compose -f docker-compose.yml run --rm frontend npm test
-        env:
-          CI: true
-          NODE_ENV: test
-        timeout-minutes: 10
-
-      # 7b. Run tests for backend service
-      - name: Run backend tests
-        run: docker compose -f docker-compose.yml run --rm backend npm test
-        env:
-          CI: true
-          NODE_ENV: test
-        timeout-minutes: 10
-
-
-      # 8. Login to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 9. Push Docker images
-      - name: Push Docker images to Docker Hub
-        run: docker compose -f docker-compose.yml push
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/my-frontend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/my-frontend:${{ github.sha }}
+
+      - name: Build & push backend image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/my-backend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/my-backend:${{ github.sha }}
